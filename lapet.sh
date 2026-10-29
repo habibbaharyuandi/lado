@@ -166,6 +166,7 @@ if stdout:
 if stderr:
     print("--- Error Log ---")
     print(stderr)
+PY
 aws s3 cp glue_job_etl.py "s3://${BUCKET_NAME}/scripts/glue_job_etl.py"
 
 # =========================
