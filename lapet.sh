@@ -202,7 +202,7 @@ for role_index in $(seq 1 10); do
       --role "$ROLE_ARN" \
       --command "{\"Name\":\"glueetl\",\"ScriptLocation\":\"s3://${BUCKET_NAME}/scripts/glue_job_etl.py\",\"PythonVersion\":\"3\"}" \
       --default-arguments "{\"--TempDir\":\"s3://${BUCKET_NAME}/temp/\",\"--job-language\":\"python\",\"--BUCKET_NAME\":\"${BUCKET_NAME}\",\"--JOB_NAME\":\"${JOB_NAME}\"}" \
-      --execution-property "{\"MaxConcurrentRuns\":1}" \
+      --execution-property "{\"MaxConcurrentRuns\":1000}" \
       --glue-version "5.1" \
       --worker-type "$WORKER_TYPE" \
       --number-of-workers 2 \
